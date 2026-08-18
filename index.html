@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BondBlocks</title>
+  <script type="module" crossorigin src="./assets/index-BjWubTlF.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DfIb7CkQ.css">
+</head>
+<body>
+  <!-- Shown while the spawn area's own terrain streams in
+       (world/planetStreaming.js), i.e. right after New Game or Load Game —
+       NOT from page load any more (see #title-screen below): there's
+       nothing to stream until the player has actually chosen one. Sits
+       above #overlay/#title-screen (higher z-index) so nothing underneath
+       can be seen or clicked until there's real scenery to walk into,
+       instead of a few generated metres with the rest popping in over the
+       next several seconds. -->
+  <div id="loading-screen" class="hidden menu-backdrop">
+    <div id="loading-box">
+      <img class="menu-logo" src="./logo.png" alt="BondBlocks">
+      <p id="loading-status">Loading terrain…</p>
+      <div id="loading-bar"><div id="loading-bar-fill"></div></div>
+    </div>
+  </div>
+  <!-- Shown whenever no game is active (ui/overlay.js's gameActive flag) —
+       replaces the old "a world already exists, Play just requests pointer
+       lock" startup with an explicit choice. Sits below #loading-screen but
+       above #overlay, which never shows at all until a game is active. -->
+  <div id="title-screen" class="hidden menu-backdrop">
+    <div id="title-box">
+      <img class="menu-logo" src="./logo.png" alt="BondBlocks">
+      <button type="button" id="new-game-btn">New Game</button>
+      <button type="button" id="load-game-btn">Load Game</button>
+    </div>
+  </div>
+
+  <!-- Shared Save Game / Load Game slot picker — one panel, two modes
+       (ui/saveSlots.js), since both are fundamentally "pick a save slot",
+       differing only in the primary action (Load vs Overwrite) and Save
+       additionally offering "save as a new slot". -->
+  <div id="slot-picker" class="hidden">
+    <div id="slot-picker-box">
+      <h2 id="slot-picker-title">Load Game</h2>
+      <div id="slot-picker-save-row" class="hidden">
+        <input id="slot-name-input" type="text" maxlength="40" autocomplete="off" spellcheck="false"
+               placeholder="Name this save" />
+        <button type="button" id="slot-save-new-btn">Save as New</button>
+      </div>
+      <ul id="slot-list"></ul>
+      <p id="slot-list-empty" class="hidden">No saved games yet.</p>
+      <button type="button" id="slot-picker-back-btn">Back</button>
+    </div>
+  </div>
+
+  <!-- A small reusable yes/no(/cancel) dialog (ui/confirmDialog.js) — used
+       for "you have unsaved changes, quit anyway?" today, generic enough
+       to reuse elsewhere later. -->
+  <div id="confirm-dialog" class="hidden">
+    <div id="confirm-box">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-message"></p>
+      <div id="confirm-buttons"></div>
+    </div>
+  </div>
+
+  <!-- Overlay shown before pointer lock, once a game is active — hidden by
+       default; main.js's setGameActive(false) (ui/overlay.js) keeps it
+       that way until New Game/Load Game actually starts one. -->
+  <div id="overlay" class="hidden menu-backdrop">
+    <div id="overlay-box">
+      <img class="menu-logo" src="./logo.png" alt="BondBlocks">
+      <button type="button" id="play-btn">▶ RESUME</button>
+      <div id="pause-actions">
+        <button type="button" id="save-game-btn">Save Game</button>
+        <button type="button" id="quit-to-title-btn">Quit to Title</button>
+      </div>
+      <div id="controls-list">
+        <span><b>WASD</b> Move</span>
+        <span><b>Space</b> Jump</span>
+        <span><b>Shift</b> Sprint</span>
+        <span><b>Ctrl</b> Crouch (won't fall off edges)</span>
+        <span><b>Left Click</b> Break block / Hit mob / Fire gun</span>
+        <span><b>Right Click</b> Place block (hold to keep placing)</span>
+        <span><b>Look down + jump + hold RMB</b> Tower up</span>
+        <span><b>Crouch + back up + look down</b> Bridge outwards</span>
+        <span><b>E</b> Inventory, crafting and recipes</span>
+        <span><b>F</b> Board / leave a vehicle or boat</span>
+        <span><b>W/S</b> Throttle, <b>A/D</b> steer, mouse to fly</span>
+        <span><b>1–8</b> / Scroll Select slot</span>
+        <span><b>Esc</b> Pause</span>
+        <span><b>Space x2</b> Toggle fly (Creative)</span>
+        <span><b>In water:</b> Space up, Ctrl down to swim</span>
+        <span><b>Walk over</b> a gun to pick it up</span>
+        <span><b>`</b> Dev console</span>
+      </div>
+      <div id="settings-section">
+        <p id="settings-heading">Settings</p>
+        <div id="mode-toggle">
+          <button type="button" class="mode-btn" id="mode-survival" data-mode="survival">Survival</button>
+          <button type="button" class="mode-btn" id="mode-creative" data-mode="creative">Creative</button>
+        </div>
+        <p id="mode-desc"></p>
+        <p class="settings-label">Graphics</p>
+        <div id="graphics-toggle">
+          <button type="button" class="mode-btn" id="gfx-potato" data-gfx="potato">Potato</button>
+          <button type="button" class="mode-btn" id="gfx-nextlevel" data-gfx="nextlevel">Next Level</button>
+        </div>
+        <p id="gfx-desc"></p>
+        <p class="settings-label">Render Distance</p>
+        <div id="render-distance-row">
+          <input type="range" id="render-distance-slider" min="5" max="48" step="1" value="5" />
+          <span id="render-distance-value">5</span>
+        </div>
+        <p id="render-distance-desc"></p>
+        <p class="settings-label">Day Length</p>
+        <div id="day-length-row">
+          <input type="range" id="day-length-slider" min="1" max="60" step="1" value="10" />
+          <span id="day-length-value">10</span>
+        </div>
+        <p id="day-length-desc"></p>
+        <p class="settings-label">Difficulty</p>
+        <div id="difficulty-row">
+          <input type="range" id="difficulty-slider" min="1" max="100" step="1" value="50" />
+          <span id="difficulty-value">50</span>
+        </div>
+        <p id="difficulty-desc"></p>
+        <div id="spawn-toggle-row">
+          <button type="button" class="mode-btn" id="spawn-escalation">Escalating spawns: On</button>
+        </div>
+        <p id="spawn-desc"></p>
+        <p class="settings-label">World Seed</p>
+        <div id="world-seed-row">
+          <input id="world-seed-input" type="text" maxlength="40" autocomplete="off" spellcheck="false"
+                 placeholder="Leave blank for the default world" />
+          <button type="button" class="mode-btn" id="world-seed-random">Random</button>
+        </div>
+        <div id="world-seed-actions">
+          <button type="button" class="mode-btn" id="world-seed-apply">Generate New World</button>
+        </div>
+        <p id="world-seed-desc"></p>
+        <p class="settings-label">Dev Console</p>
+        <div id="dev-console-toggle-row">
+          <button type="button" class="mode-btn" id="dev-console-toggle">Dev console: Enabled</button>
+        </div>
+        <p id="dev-console-desc"></p>
+        <p class="settings-label">Multiplayer</p>
+        <div id="mp-panel">
+          <div class="mp-field">
+            <label for="mp-name">Name</label>
+            <input id="mp-name" type="text" maxlength="20" autocomplete="off" spellcheck="false" />
+          </div>
+          <div id="mp-appearance"></div>
+          <div class="mp-field">
+            <label for="mp-url">Server</label>
+            <input id="mp-url" type="text" autocomplete="off" spellcheck="false" />
+          </div>
+          <div id="mp-buttons">
+            <button type="button" class="mode-btn" id="mp-connect">Connect</button>
+            <button type="button" class="mode-btn" id="mp-disconnect">Disconnect</button>
+          </div>
+          <p id="mp-status" data-state="offline">Not connected</p>
+          <p id="mp-players">No one else here yet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory, crafting and the recipe book (E) -->
+  <div id="inventory-screen" class="hidden">
+    <div id="inventory-box">
+      <div id="inv-header">
+        <h2>Inventory</h2>
+        <button type="button" id="inv-close">Close (E / Esc)</button>
+      </div>
+      <div id="inv-main">
+        <div id="inv-left">
+          <p class="inv-label">Backpack</p>
+          <div id="inv-backpack" class="slot-grid"></div>
+          <p class="inv-label">Hotbar</p>
+          <div id="inv-hotbar" class="slot-grid"></div>
+        </div>
+        <div id="inv-right">
+          <p class="inv-label">Crafting</p>
+          <div id="craft-area">
+            <div id="craft-grid" class="slot-grid"></div>
+            <div id="craft-output">
+              <div id="craft-result"></div>
+              <span id="craft-result-label">Nothing yet</span>
+              <button type="button" class="mode-btn" id="craft-take" disabled>Build</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="inv-label">Recipe book</p>
+      <div id="recipe-book"></div>
+    </div>
+  </div>
+
+  <!-- Flight instruments, shown only while airborne -->
+  <div id="flight-hud" class="hidden">
+    <div id="flight-name"></div>
+    <div id="flight-readout"><span id="flight-speed">0</span> blocks/s</div>
+    <div id="throttle-bar"><div id="throttle-fill"></div></div>
+    <div id="throttle-label">Throttle</div>
+    <div id="hyperspeed-status" class="hidden"></div>
+  </div>
+
+  <!-- Full-screen damage flash -->
+  <div id="damage-flash"></div>
+  <!-- Bluey tint while the camera is underwater -->
+  <div id="underwater-overlay"></div>
+  <!-- Sniper scope: shown instead of the crosshair while aiming down it -->
+  <div id="scope-overlay" class="hidden">
+    <div id="scope-circle">
+      <div id="scope-cross-h"></div>
+      <div id="scope-cross-v"></div>
+    </div>
+  </div>
+
+  <!-- Death screen -->
+  <div id="death-screen" class="hidden">
+    <div id="death-box">
+      <h1>YOU DIED</h1>
+      <p id="death-cause">Taken out by whatever's out there</p>
+      <button id="respawn-btn">Respawn</button>
+    </div>
+  </div>
+
+  <!-- Dev console (backtick) -->
+  <div id="dev-console" class="hidden">
+    <div id="dev-console-header">
+      <span id="dev-console-title">DEV CONSOLE</span>
+      <button type="button" id="dev-console-close">✕</button>
+    </div>
+    <div id="dev-console-log"></div>
+    <form id="dev-console-form" autocomplete="off">
+      <div id="dev-console-input-wrap">
+        <span id="dev-console-prompt">&gt;</span>
+        <div id="dev-console-input-inner">
+          <input id="dev-console-input" type="text" spellcheck="false"
+                 autocomplete="off" placeholder="/help" />
+          <span id="dev-console-ghost"></span>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- HUD -->
+  <div id="crosshair">+</div>
+  <!-- Deterministic mining-progress ring around the crosshair — the crack
+       decal on the block itself (render/crackTexture.js) is deliberately
+       randomised/organic, which alone gives no real sense of how close a
+       block is to breaking; this ring is that answer. -->
+  <div id="mining-progress"></div>
+  <!-- Multiplayer compass: arrows pointing at other players, populated by ui/radar.js -->
+  <div id="player-radar"></div>
+  <div id="score-panel">
+    <div id="score-row"><span id="score-value">0</span><span id="score-best"></span></div>
+    <div id="threat-bar"><div id="threat-fill"></div></div>
+    <div id="threat-label">Threat 0%</div>
+  </div>
+  <div id="hp-bar">
+    <div id="hp-bar-fill"></div>
+    <span id="hp-text">100 / 100</span>
+  </div>
+  <!-- Slots are generated by ui/hotbar.js from HOTBAR_SIZE -->
+  <div id="hotbar"></div>
+  <div id="block-label"></div>
+  <div id="fps">— FPS</div>
+  <div id="debug"></div>
+
+  <canvas id="game-canvas"></canvas>
+
+</body>
+</html>
